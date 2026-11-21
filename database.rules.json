@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "sessions": {
+      "$code": {
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.exists() ? newData.child('hostUid').val() === auth.uid : data.child('hostUid').val() === auth.uid)"
+        },
+        "content": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('sessions').child($code).child('meta/hostUid').val() === auth.uid"
+        },
+        "teams": {
+          ".read": "auth != null && root.child('sessions').child($code).child('meta/hostUid').val() === auth.uid",
+          "$teamId": {
+            ".read": "auth != null && data.child('uid').val() === auth.uid",
+            ".write": "auth != null && root.child('sessions').child($code).child('meta').exists() && (!data.exists() ? newData.child('uid').val() === auth.uid : (data.child('uid').val() === auth.uid || root.child('sessions').child($code).child('meta/hostUid').val() === auth.uid))"
+          }
+        }
+      }
+    }
+  }
+}
