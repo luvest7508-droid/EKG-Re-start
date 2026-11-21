@@ -21,42 +21,68 @@ const Sync = (() => {
   let impl = null;
 
   function DemoAdapter() {
-    const KEY = 'ecg_restart_demo_db_v1';
+    /* 저장 단위(bucket)를 나눠 탭끼리 서로의 기록을 덮어쓰지 않게 함
+       sessions/{c}/meta · sessions/{c}/content · sessions/{c}/teams/{id} 각각 별도 키 */
+    const PFX = 'ecgdemo|';
     const listeners = new Set();
     let ch = null;
     try { ch = new BroadcastChannel('ecg_restart_demo'); ch.onmessage = () => notify(); } catch (e) { /* 미지원 브라우저 */ }
-    window.addEventListener('storage', e => { if (e.key === KEY) notify(); });
-
-    const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { sessions: {} }; } catch (e) { return { sessions: {} }; } };
-    const write = db => {
-      try { localStorage.setItem(KEY, JSON.stringify(db)); }
-      catch (e) { U.toast('브라우저 저장공간이 부족합니다 (이미지 용량 확인)', 'err'); throw e; }
-      notify(); ch && ch.postMessage('changed');
-    };
+    window.addEventListener('storage', e => { if (!e.key || e.key.startsWith(PFX)) notify(); });
     function notify() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
-    const getAt = (db, path) => path.split('/').reduce((o, k) => (o == null ? undefined : o[k]), db);
-    function setAt(path, val) {
-      const db = read(); const ks = path.split('/'); let o = db;
-      ks.slice(0, -1).forEach(k => { if (o[k] == null || typeof o[k] !== 'object') o[k] = {}; o = o[k]; });
-      if (val === null) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = U.clean(val);
-      write(db);
+    const segs = p => p.split('/').filter(Boolean);
+    const bucketLen = sg => (sg[2] === 'teams' ? 4 : 3);
+    const readKey = k => { try { const v = localStorage.getItem(PFX + k); return v == null ? undefined : JSON.parse(v); } catch (e) { return undefined; } };
+    const keysUnder = prefix => Object.keys(localStorage).filter(k => k.startsWith(PFX) && (k.slice(PFX.length) === prefix || k.slice(PFX.length).startsWith(prefix + '/'))).map(k => k.slice(PFX.length));
+    function getPath(path) {
+      const sg = segs(path), bl = bucketLen(sg);
+      if (sg.length >= bl) {
+        let o = readKey(sg.slice(0, bl).join('/'));
+        for (const k of sg.slice(bl)) { if (o == null) return undefined; o = o[k]; }
+        return o;
+      }
+      const out = {}; let any = false;
+      for (const k of keysUnder(sg.join('/'))) {
+        const rest = segs(k).slice(sg.length); let o = out;
+        rest.slice(0, -1).forEach(x => { o[x] = o[x] || {}; o = o[x]; });
+        o[rest[rest.length - 1]] = readKey(k); any = true;
+      }
+      return any ? out : undefined;
+    }
+    function setPath(path, val) {
+      const sg = segs(path), bl = bucketLen(sg);
+      try {
+        if (sg.length >= bl) {
+          const key = sg.slice(0, bl).join('/'), sub = sg.slice(bl);
+          if (!sub.length) { val === null ? localStorage.removeItem(PFX + key) : localStorage.setItem(PFX + key, JSON.stringify(U.clean(val))); }
+          else {
+            const root = readKey(key) || {}; let o = root;
+            sub.slice(0, -1).forEach(x => { if (o[x] == null || typeof o[x] !== 'object') o[x] = {}; o = o[x]; });
+            if (val === null) delete o[sub[sub.length - 1]]; else o[sub[sub.length - 1]] = U.clean(val);
+            localStorage.setItem(PFX + key, JSON.stringify(root));
+          }
+        } else {
+          keysUnder(sg.join('/')).forEach(k => localStorage.removeItem(PFX + k));
+          if (val !== null && typeof val === 'object') Object.entries(val).forEach(([k, v]) => setPath(path + '/' + k, v));
+        }
+      } catch (e) { U.toast('브라우저 저장공간이 부족합니다 (이미지 용량 확인)', 'err'); throw e; }
+      notify(); ch && ch.postMessage('changed');
     }
     return {
       async init() {},
       uid: () => 'demo-' + (sessionStorage.getItem('ecg_demo_uid') || (() => { const v = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('ecg_demo_uid', v); return v; })()),
       now: () => Date.now(),
-      async get(p) { return U.clone(getAt(read(), p) ?? null); },
-      async set(p, v) { setAt(p, v); },
-      async update(p, patch) { const cur = getAt(read(), p) || {}; setAt(p, Object.assign({}, cur, patch)); },
-      async push(p, v) { const id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); setAt(p + '/' + id, v); return id; },
-      async remove(p) { setAt(p, null); },
+      async get(p) { return U.clone(getPath(p) ?? null); },
+      async set(p, v) { setPath(p, v); },
+      async update(p, patch) { const cur = getPath(p) || {}; setPath(p, Object.assign({}, cur, patch)); },
+      async push(p, v) { const id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); setPath(p + '/' + id, v); return id; },
+      async remove(p) { setPath(p, null); },
       watch(p, cb) {
         let last;
-        const fn = () => { const v = JSON.stringify(getAt(read(), p) ?? null); if (v !== last) { last = v; cb(JSON.parse(v)); } };
+        const fn = () => { const v = JSON.stringify(getPath(p) ?? null); if (v !== last) { last = v; cb(JSON.parse(v)); } };
         listeners.add(fn); fn();
         return () => listeners.delete(fn);
       },
-      resetAll() { localStorage.removeItem(KEY); notify(); ch && ch.postMessage('changed'); }
+      resetAll() { Object.keys(localStorage).filter(k => k.startsWith(PFX)).forEach(k => localStorage.removeItem(k)); notify(); ch && ch.postMessage('changed'); }
     };
   }
 

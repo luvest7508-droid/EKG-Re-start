@@ -11,7 +11,7 @@ const Engine = (() => {
   function normalizeContent(c) {
     c = c || {};
     c.rooms = arr(c.rooms).map(r => {
-      r.topics = arr(r.topics);
+      r.topics = arr(r.topics); r.props = arr(r.props);
       r.questions = arr(r.questions).map(q => {
         q.options = arr(q.options).map(o => ({ text: o.text || '', feedback: o.feedback || '', danger: !!o.danger }));
         q.answer = Number(q.answer) || 0;
@@ -37,8 +37,8 @@ const Engine = (() => {
     rooms(c).forEach((r, ri) => r.questions.forEach((q, qi) => out.push({ room: r, ri, q, qi })));
     return out;
   }
-  function newTeam(name, uid) {
-    return { name, uid, joinedAt: Sync.now(), stage: 'start', roomIndex: 0, qIndex: 0, score: 0, hintsUsed: 0, wrong: 0, danger: 0, lockFails: 0, timeBonus: 0, finishedAt: 0, answers: {} };
+  function newTeam(name, uid, character) {
+    return { name, uid, character: character || 'doctor', joinedAt: Sync.now(), stage: 'start', roomIndex: 0, qIndex: 0, score: 0, hintsUsed: 0, wrong: 0, danger: 0, lockFails: 0, timeBonus: 0, finishedAt: 0, answers: {} };
   }
   function current(t, c) { const room = rooms(c)[t.roomIndex]; return { room, q: room && room.questions[t.qIndex] }; }
   function ans(t, qid) {

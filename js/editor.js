@@ -40,7 +40,10 @@ const Editor = (() => {
     bind();
   }
   function tree() {
-    return `<label class="field sm">문제 세트 이름<input data-root="title" value="${U.esc(C.title || '')}"></label>` +
+    return `<label class="field sm">문제 세트 이름<input data-root="title" value="${U.esc(C.title || '')}"></label>
+      <details><summary>오프닝·엔딩 스토리</summary>
+        <label class="field sm">오프닝<textarea data-root="story" rows="5">${U.esc(C.story || '')}</textarea></label>
+        <label class="field sm">엔딩<textarea data-root="ending" rows="3">${U.esc(C.ending || '')}</textarea></label></details>` +
       C.rooms.map((r, ri) => `<div class="ed-room">
         <button class="ed-node room ${sel.r === ri && sel.q < 0 ? 'on' : ''}" data-sel="${ri}:-1"><b>${U.esc(r.code)}</b> ${U.esc(r.title)}</button>
         ${r.questions.map((q, qi) => `<button class="ed-node ${sel.r === ri && sel.q === qi ? 'on' : ''}" data-sel="${ri}:${qi}">Q${qi + 1}. ${U.esc(q.title || '(제목 없음)')}${q.image ? ' <span class="tag teal">IMG</span>' : ''}</button>`).join('')}
@@ -50,6 +53,10 @@ const Editor = (() => {
   const inp = (label, path, val, extra = '') => `<label class="field">${label}<input data-b="${path}" value="${U.esc(val ?? '')}" ${extra}></label>`;
   const ta = (label, path, val, rows = 3) => `<label class="field">${label}<textarea data-b="${path}" rows="${rows}">${U.esc(val ?? '')}</textarea></label>`;
 
+  function objOptions(room, cur) {
+    const sc = Scenes[room.scene] || Scenes.monitoring;
+    return Object.entries(sc.slots).map(([k, v]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${U.esc(v.label)}</option>`).join('');
+  }
   function roomForm() {
     const r = C.rooms[sel.r]; if (!r) return '';
     const pieces = r.questions.map(q => q.codePiece || '').join('');
@@ -58,6 +65,15 @@ const Editor = (() => {
     const ci = r.caseInfo || {};
     return `<h3>Room 설정</h3>
       <div class="g2">${inp('Room 코드 (표시용)', 'code', r.code)}${inp('Room 제목', 'title', r.title)}</div>
+      <div class="g2"><label class="field">방 장면 (배경·사물 배치)<select data-b="scene">${Object.entries(Scenes).map(([k, v]) => `<option value="${k}" ${r.scene === k ? 'selected' : ''}>${U.esc(v.name)} (${k})</option>`).join('')}</select></label>${inp('장소 이름', 'place', r.place)}</div>
+      ${ta('입장 스토리', 'story', r.story, 3)}
+      <details open><summary>조사하면 단서가 나오는 사물 (문제와 연결되지 않은 사물)</summary>
+        <div class="ed-props">${(r.props || []).map((pp, i) => `<div class="ed-prop">
+          <label class="field">사물<select data-b="props.${i}.object">${objOptions(r, pp.object)}</select></label>
+          ${inp('조사 시 나오는 글', `props.${i}.text`, pp.text)}
+          <button class="btn ghost xs" data-delprop="${i}" title="삭제">✕</button></div>`).join('')}
+          <button class="ed-add" data-ed="addProp">+ 단서 사물 추가</button></div>
+      </details>
       ${inp('부제', 'subtitle', r.subtitle)}
       ${ta('미션 목표', 'objective', r.objective, 2)}
       ${inp('교육 내용 (쉼표로 구분)', 'topics', (r.topics || []).join(', '), 'data-t="csv"')}
@@ -75,6 +91,10 @@ const Editor = (() => {
       <div class="g3">${inp('문제 제목', 'title', q.title)}
         <label class="field">난이도<select data-b="difficulty" data-t="num">${[1, 2, 3].map(d => `<option value="${d}" ${q.difficulty === d ? 'selected' : ''}>${'★'.repeat(d)} (${d})</option>`).join('')}</select></label>
         ${inp('배점', 'points', q.points, 'type="number" min="0" step="10" data-t="num"')}</div>
+      <div class="g3"><label class="field">이 문제가 숨겨진 사물<select data-b="object">${objOptions(C.rooms[sel.r], q.object)}</select></label>
+        ${inp('풀면 얻는 아이템 이름', 'item.name', (q.item || {}).name)}
+        <label class="field">아이템 그림<select data-b="item.icon">${[['key', '열쇠'], ['card', '카드키'], ['note', '메모'], ['strip', '심전도 용지'], ['chip', '칩']].map(([k, l]) => `<option value="${k}" ${(q.item || {}).icon === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+      <p class="muted small">문제는 Room 안의 순서대로 열립니다. 앞 문제를 풀어 얻은 아이템이 다음 사물의 잠금을 풉니다.</p>
       ${ta('문제 내용 (판독 소견·질문)', 'stem', q.stem, 4)}
       <div class="img-edit">
         <div class="img-prev">${q.image ? `<img src="${U.esc(q.image)}" alt="미리보기">` : '<span class="muted small">이미지 없음</span>'}</div>
@@ -115,9 +135,8 @@ const Editor = (() => {
     U.$$('[data-b]', el).forEach(e => {
       const evt = e.type === 'checkbox' || e.tagName === 'SELECT' ? 'change' : 'input';
       e.addEventListener(evt, () => { if (e.readOnly) return; setPath(target(), e.dataset.b, val(e)); persist(); });
-      e.addEventListener('change', () => { U.$('.ed-tree', el).innerHTML = tree(); bindTree(); if (sel.q < 0 && /password|codePiece/.test(e.dataset.b)) draw(); });
+      e.addEventListener('change', () => { U.$('.ed-tree', el).innerHTML = tree(); bindTree(); if (sel.q < 0 && /password|codePiece|scene/.test(e.dataset.b)) draw(); });
     });
-    U.$$('[data-root]', el).forEach(e => e.oninput = () => { C.title = e.value; persist(); });
     U.$$('[data-ans]', el).forEach(e => e.onchange = () => { target().answer = Number(e.value); persist(); draw(); });
     U.$$('[data-delopt]', el).forEach(b => b.onclick = () => {
       const q = target(); if (q.options.length <= 2) return U.toast('선택지는 최소 2개가 필요합니다', 'err');
@@ -125,6 +144,7 @@ const Editor = (() => {
       if (q.answer === i) q.answer = 0; else if (q.answer > i) q.answer--;
       persist(); draw();
     });
+    U.$$('[data-delprop]', el).forEach(b => b.onclick = () => { target().props.splice(Number(b.dataset.delprop), 1); persist(); draw(); });
     bindTree();
     U.$$('[data-ed]', el).forEach(b => { const ev = b.tagName === 'INPUT' ? 'onchange' : 'onclick'; b[ev] = e => action(b.dataset.ed, e); });
   }
@@ -134,11 +154,12 @@ const Editor = (() => {
       const ri = Number(b.dataset.addq);
       C.rooms[ri].questions.push(blankQ(ri)); sel = { r: ri, q: C.rooms[ri].questions.length - 1 }; persist(); draw();
     });
-    U.$$('[data-root]', el).forEach(e => e.oninput = () => { C.title = e.value; persist(); });
+    U.$$('[data-root]', el).forEach(e => e.oninput = () => { C[e.dataset.root] = e.value; persist(); });
     const ar = U.$('[data-ed="addRoom"]', el); if (ar) ar.onclick = () => action('addRoom');
   }
   function blankQ(ri) {
-    return { id: 'q' + Date.now().toString(36), title: '새 문제', difficulty: 1, points: 100, stem: '', image: '', imageCaption: '', imageSource: '',
+    const sc = Scenes[C.rooms[ri].scene] || Scenes.monitoring;
+    return { id: 'q' + Date.now().toString(36), title: '새 문제', difficulty: 1, points: 100, object: Object.keys(sc.slots)[0], item: { name: '단서 메모', icon: 'note' }, stem: '', image: '', imageCaption: '', imageSource: '',
       options: [{ text: '선택지 A', feedback: '', danger: false }, { text: '선택지 B', feedback: '', danger: false }, { text: '선택지 C', feedback: '', danger: false }, { text: '선택지 D', feedback: '', danger: false }],
       answer: 0, hint: '', explanation: '', codePiece: '', reference: '' };
   }
@@ -168,7 +189,7 @@ const Editor = (() => {
         if (confirm('수정 내용을 삭제하고 content/questions.js의 기본 문제로 되돌립니다.')) { localStorage.removeItem(KEY); C = getContent(); sel = { r: 0, q: -1 }; draw(); U.toast('기본값으로 복원'); }
         break;
       case 'addRoom':
-        C.rooms.push({ id: 'room' + Date.now().toString(36), code: `ROOM 0${C.rooms.length + 1}`, title: 'NEW ROOM', subtitle: '', objective: '', topics: [], password: '', lockClue: '', questions: [] });
+        C.rooms.push({ id: 'room' + Date.now().toString(36), code: `ROOM 0${C.rooms.length + 1}`, title: 'NEW ROOM', place: '', scene: 'monitoring', story: '', subtitle: '', objective: '', topics: [], password: '', lockClue: '', props: [], questions: [] });
         sel = { r: C.rooms.length - 1, q: -1 }; persist(); draw(); break;
       case 'delRoom': if (C.rooms.length > 1 && confirm(`${room.code}와 포함된 문제를 모두 삭제합니다.`)) { C.rooms.splice(sel.r, 1); sel = { r: 0, q: -1 }; persist(); draw(); } break;
       case 'roomUp': sel.r = move(C.rooms, sel.r, -1); persist(); draw(); break;
@@ -177,6 +198,7 @@ const Editor = (() => {
       case 'qDown': sel.q = move(room.questions, sel.q, 1); persist(); draw(); break;
       case 'qDup': { const c = U.clone(room.questions[sel.q]); c.id = 'q' + Date.now().toString(36); c.title += ' (복제)'; room.questions.splice(sel.q + 1, 0, c); sel.q++; persist(); draw(); break; }
       case 'delQ': if (confirm('이 문제를 삭제합니다.')) { room.questions.splice(sel.q, 1); sel.q = -1; persist(); draw(); } break;
+      case 'addProp': { const r = target(); r.props = r.props || []; r.props.push({ object: Object.keys((Scenes[r.scene] || Scenes.monitoring).slots)[0], text: '' }); persist(); draw(); break; }
       case 'addOpt': target().options.push({ text: '', feedback: '', danger: false }); persist(); draw(); break;
       case 'imgDel': target().image = ''; persist(); draw(); break;
       case 'img': {

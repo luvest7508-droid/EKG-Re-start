@@ -41,6 +41,15 @@ const U = {
   icon: {
     lock: `<svg viewBox="0 0 64 64" class="ic-lock" aria-hidden="true"><path class="shackle" d="M20 28 V20 a12 12 0 0 1 24 0 V28" fill="none" stroke-width="5" stroke-linecap="round"/><rect x="12" y="28" width="40" height="28" rx="6"/><circle cx="32" cy="41" r="4" class="hole"/><rect x="30.5" y="42" width="3" height="7" rx="1.5" class="hole"/></svg>`
   },
+  /** 받침에 따라 조사 선택: josa('열쇠','이','가') */
+  josa(w, a, b) { const c = String(w).trim().slice(-1).charCodeAt(0); if (c < 0xAC00 || c > 0xD7A3) return w + a + '(' + b + ')'; return w + ((c - 0xAC00) % 28 ? a : b); },
+  /** 타자기 효과 — 탭하면 즉시 완료 */
+  typewrite(el, text, speed = 26) {
+    if (!el) return; let i = 0; el.textContent = ''; el.classList.add('typing');
+    const t = setInterval(() => { i++; el.textContent = text.slice(0, i); if (i % 3 === 0) Sfx.tick(); if (i >= text.length) done(); }, speed);
+    function done() { clearInterval(t); el.textContent = text; el.classList.remove('typing'); }
+    el.closest('section')?.addEventListener('click', done, { once: true });
+  },
   download(name, text, type = 'application/json') {
     const blob = new Blob([text], { type });
     const a = document.createElement('a');
@@ -63,3 +72,31 @@ const U = {
     } catch (e) { return ''; }
   }
 };
+
+/* 8비트 효과음 (WebAudio, 파일 없음) */
+const Sfx = (() => {
+  let ctx = null, on = localStorage.getItem('ecg_sfx') !== 'off';
+  function ac() { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (ctx && ctx.state === 'suspended') ctx.resume(); return ctx; }
+  function tone(f, d = 0.12, type = 'square', vol = 0.045, when = 0) {
+    if (!on) return; const c = ac(); if (!c) return;
+    const o = c.createOscillator(), g = c.createGain(), t0 = c.currentTime + when;
+    o.type = type; o.frequency.setValueAtTime(f, t0);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + d + 0.02);
+  }
+  const seq = (fs, step, d, type, vol) => fs.forEach((f, i) => tone(f, d, type, vol, i * step));
+  document.addEventListener('pointerdown', () => ac(), { once: true });
+  return {
+    get on() { return on; },
+    toggle() { on = !on; localStorage.setItem('ecg_sfx', on ? 'on' : 'off'); if (on) tone(880, .08); return on; },
+    tick() { tone(1200, .02, 'square', .015); },
+    click() { tone(700, .05, 'square', .03); },
+    ok() { seq([523, 659, 784, 1047], .08, .12); },
+    bad() { tone(196, .18, 'sawtooth', .05); tone(147, .25, 'sawtooth', .05, .15); },
+    deny() { tone(260, .07); tone(220, .1, 'square', .045, .09); },
+    item() { seq([784, 988, 1319, 1568], .07, .11, 'triangle', .07); },
+    unlock() { seq([392, 523, 659, 784, 1047, 1319], .09, .15); },
+    dial() { tone(1500, .03, 'square', .025); },
+    win() { seq([523, 523, 784, 1047, 988, 1047, 1319], .12, .18, 'square', .05); }
+  };
+})();

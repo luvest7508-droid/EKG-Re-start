@@ -17,7 +17,8 @@ const Host = (() => {
     renderSetup();
   }
 
-  const brand = () => `<div class="brand"><span class="brand-logo">${U.ecgLine('sweep')}</span><div><div class="brand-name">ECG <em>Re:Start</em></div><div class="brand-sub">INSTRUCTOR CONSOLE</div></div></div>`;
+  const ava = (t, sc = 1) => `<span class="t-ava">${Pix.img(Pix.character(t.character || 'doctor'), sc)}</span>`;
+  const brand = () => `<div class="brand"><span class="brand-logo">${Pix.img(Pix.character('doctor'), 2)}</span><div><div class="brand-name">ECG <em>Re:Start</em></div><div class="brand-sub">INSTRUCTOR CONSOLE</div></div></div>`;
   const badge = () => Sync.mode === 'demo' ? '<span class="badge demo" title="같은 브라우저의 탭끼리만 공유됩니다">DEMO MODE</span>' : '<span class="badge live">LIVE · Firebase</span>';
 
   /* ---------- 세션 생성 화면 ---------- */
@@ -192,11 +193,11 @@ const Host = (() => {
     cols.push({ label: 'ESCAPED', title: '완료', teams: list.filter(t => t.stage === 'done'), ok: true });
     return `<div class="room-flow">${cols.map(col => `<div class="room-col ${col.ok ? 'ok' : ''} ${col.teams.length ? 'has' : ''}">
         <div class="rc-head"><span>${U.esc(col.label)}</span><b>${col.teams.length}</b></div><div class="rc-title">${U.esc(col.title)}</div>
-        <div class="rc-teams">${col.teams.map(t => `<span>${U.esc(t.name)}</span>`).join('')}</div></div>`).join('<div class="rc-arrow">›</div>')}</div>
+        <div class="rc-teams">${col.teams.map(t => `<span>${ava(t, 1)}${U.esc(t.name)}</span>`).join('')}</div></div>`).join('<div class="rc-arrow">›</div>')}</div>
       <table class="tbl"><thead><tr><th>${H.hide ? '' : '순위'}</th><th>팀</th><th>현재 위치</th><th>진행률</th><th class="num">점수</th><th class="num">힌트</th><th class="num">오답</th><th class="num">위험 판단</th></tr></thead><tbody>
       ${list.map((t, i) => { const s = Engine.solved(t, c), p = total ? s / total * 100 : 0; return `<tr>
         <td class="rank">${H.hide ? '' : i + 1}</td>
-        <td class="tname">${U.esc(t.name)}${t.bot ? ' <span class="tag">BOT</span>' : ''}</td>
+        <td class="tname">${ava(t)}${U.esc(t.name)}${t.bot ? ' <span class="tag">BOT</span>' : ''}</td>
         <td>${U.esc(Engine.location(t, c))}</td>
         <td><div class="bar"><i style="width:${p}%"></i></div><small class="muted">${s}/${total}</small></td>
         <td class="num score">${H.hide ? '•••' : t.score}</td><td class="num">${t.hintsUsed}</td><td class="num">${t.wrong}</td>
@@ -289,7 +290,7 @@ const Host = (() => {
     if (!list.length) return '<div class="empty-state"><h3>참여 팀이 없습니다</h3></div>';
     return `<div class="row-between"><p class="muted">순위: 총점 → 동점 시 먼저 완료한 팀</p><button class="btn primary" id="openResults">🏆 결과 발표 화면</button></div>
       <table class="tbl"><thead><tr><th>순위</th><th>팀</th><th class="num">총점</th><th class="num">1차 정답</th><th class="num">해결</th><th class="num">시간 보너스</th><th class="num">힌트</th><th class="num">위험 판단</th><th>완료 시간</th></tr></thead><tbody>
-      ${list.map((t, i) => `<tr class="${i < 3 ? 'top' + (i + 1) : ''}"><td class="rank">${i + 1}</td><td class="tname">${U.esc(t.name)}</td><td class="num score">${t.score}</td>
+      ${list.map((t, i) => `<tr class="${i < 3 ? 'top' + (i + 1) : ''}"><td class="rank">${i + 1}</td><td class="tname">${ava(t)}${U.esc(t.name)}</td><td class="num score">${t.score}</td>
         <td class="num">${Engine.firstTryCount(t, c)}/${total}</td><td class="num">${Engine.solved(t, c)}/${total}</td><td class="num">+${t.timeBonus}</td>
         <td class="num">${t.hintsUsed}</td><td class="num ${t.danger ? 'warn' : ''}">${t.danger}</td>
         <td>${t.finishedAt && H.meta && H.meta.startedAt ? U.fmtTime((t.finishedAt - H.meta.startedAt - (H.meta.pausedTotalMs || 0)) / 1000) : (t.stage === 'done' ? '완료' : '미완료')}</td></tr>`).join('')}
@@ -300,8 +301,8 @@ const Host = (() => {
     const pod = [list[1], list[0], list[2]];
     const html = `<div class="ov-inner results-ov">
       <div class="results-head">${U.ecgLine('sweep big ok')}<div class="label">FINAL RESULT</div><h1 class="title sm">ECG <span>Re:Start</span></h1></div>
-      <div class="podium">${pod.map((t, k) => { const rank = [2, 1, 3][k]; return t ? `<div class="pod p${rank}" style="animation-delay:${[0.6, 1.2, 0.2][k]}s"><div class="pod-name">${U.esc(t.name)}</div><div class="pod-score">${t.score}</div><div class="pod-bar"><span>${rank}</span></div></div>` : '<div class="pod empty"></div>'; }).join('')}</div>
-      <ol class="rest" start="4">${list.slice(3).map(t => `<li><span>${U.esc(t.name)}</span><b>${t.score}</b></li>`).join('')}</ol>
+      <div class="podium">${pod.map((t, k) => { const rank = [2, 1, 3][k]; return t ? `<div class="pod p${rank}" style="animation-delay:${[0.6, 1.2, 0.2][k]}s"><div class="pod-ava">${Pix.img(Pix.character(t.character, 'happy'), rank === 1 ? 5 : 4, rank === 1 ? 'jump' : 'bob')}</div><div class="pod-name">${U.esc(t.name)}</div><div class="pod-score">${t.score}</div><div class="pod-bar"><span>${rank}</span></div></div>` : '<div class="pod empty"></div>'; }).join('')}</div>
+      <ol class="rest" start="4">${list.slice(3).map(t => `<li><span>${ava(t)}${U.esc(t.name)}</span><b>${t.score}</b></li>`).join('')}</ol>
       <div class="ov-foot"><span class="spacer"></span><button class="btn ghost" data-close>닫기 (Esc)</button></div></div>`;
     overlay(html, ov => { U.$('[data-close]', ov).onclick = closeOverlay; });
   }
@@ -325,7 +326,7 @@ const Host = (() => {
   /* ---------- DEMO: 리허설용 가상 팀 ---------- */
   async function addBots() {
     const names = ['가상팀 Alpha', '가상팀 Bravo', '가상팀 Charlie'];
-    for (const n of names) { const t = Engine.newTeam(n, 'bot'); t.bot = true; await Sync.push(P.teams(H.code), t); }
+    for (const n of names) { const t = Engine.newTeam(n, 'bot', U.pick(Pix.CHARACTERS).id); t.bot = true; await Sync.push(P.teams(H.code), t); }
     U.toast('가상 팀 3개 추가 — 게임 시작 시 자동으로 진행합니다');
   }
   function botLoop() {
