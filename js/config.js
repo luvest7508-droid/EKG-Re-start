@@ -10,16 +10,16 @@
  * firebase로 설정했는데 값이 비어 있거나 연결에 실패하면 자동으로 DEMO MODE로 실행됩니다.
  * ========================================================= */
 window.APP_CONFIG = {
-  MODE: 'demo',
+  MODE: 'firebase',
 
   FIREBASE: {
-    apiKey: '',
-    authDomain: '',
-    databaseURL: '',      // 예: https://ecg-restart-default-rtdb.asia-southeast1.firebasedatabase.app
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
+    apiKey: 'AIzaSyCc0whpXtEmp52DGdUffnsIIVQKH-LBAck',
+    authDomain: 'ecg-restart.firebaseapp.com',
+    databaseURL: 'https://ecg-restart-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'ecg-restart',
+    storageBucket: 'ecg-restart.firebasestorage.app',
+    messagingSenderId: '356900591723',
+    appId: '1:356900591723:web:138bd0452914351ef5f92e'
   },
 
   DEFAULT_DURATION_MIN: 20,
